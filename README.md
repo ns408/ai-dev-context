@@ -115,6 +115,44 @@ Generated files are added to `.gitignore` automatically. See [`docs/CROSS_TOOL_S
 
 ---
 
+## review-memory-write.sh — manual review before changes stick
+
+Claude Code can write to MEMORY.md silently during a session. If it saves wrong conclusions, misattributed bugs, or stale state you may not notice until the next session.
+
+`review-memory-write.sh` is a Claude Code hook that intercepts every write to MEMORY.md and shows you a diff before the change becomes permanent.
+
+```
+  Claude writes MEMORY.md
+        │
+        ▼
+  PostToolUse hook fires
+        │
+        ▼
+  ┌─────────────────────────────────┐
+  │  diff of what changed           │
+  │                                 │
+  │  a  Approve — keep as-is        │
+  │  e  Edit    — open in $EDITOR   │
+  │  d  Discard — restore previous  │
+  └─────────────────────────────────┘
+```
+
+### Setup
+
+```bash
+# 1. Put the script on your PATH
+cp scripts/review-memory-write.sh ~/.local/bin/
+chmod +x ~/.local/bin/review-memory-write.sh
+
+# 2. Install the hook config into your project
+mkdir -p .claude
+cp /path/to/ai-dev-context/templates/settings.json .claude/settings.json
+```
+
+The `templates/settings.json` file registers the hook for both `PreToolUse` (backup) and `PostToolUse` (review). If your project already has a `.claude/settings.json`, merge the `hooks` block in manually.
+
+---
+
 ## Complementary tools
 
 These tools solve adjacent problems and work well alongside this system:

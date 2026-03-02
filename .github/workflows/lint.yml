@@ -34,4 +34,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check script syntax
-        run: bash -n scripts/ai-config-sync.sh && bash -n scripts/ai-memory-link.sh
+        run: bash -n scripts/ai-config-sync.sh && bash -n scripts/ai-memory-link.sh && bash -n scripts/review-memory-write.sh
