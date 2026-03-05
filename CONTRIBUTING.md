@@ -6,34 +6,11 @@ This project is in early, working state. Contributions that improve clarity, fix
 
 ## Open problems worth solving
 
-### 1. Memory review UX before commit
+### 1. Memory review UX before commit ✅ _solved_
 
-**The gap:** Claude Code's auto-memory writes MEMORY.md silently during a session. There's no moment where you review what was written before it becomes permanent. You might end up persisting wrong conclusions, misattributed bugs, or stale state.
+**Implemented in:** `scripts/review-memory-write.sh` + `templates/settings.json`
 
-**The idea:** A `PostToolUse` hook that fires whenever MEMORY.md is written. The hook would show a diff of changes and prompt: approve, edit, or discard.
-
-```json
-// .claude/settings.json
-{
-  "hooks": {
-    "PostToolUse": [{
-      "matcher": "Write|Edit",
-      "hooks": [{
-        "type": "command",
-        "command": "scripts/review-memory-write.sh"
-      }]
-    }]
-  }
-}
-```
-
-The hook script would:
-1. Check if the written file is `MEMORY.md`
-2. Show `git diff` of the change
-3. Prompt: approve / edit / discard
-4. On discard: `git checkout -- MEMORY.md`
-
-This is genuinely unaddressed by any existing tool (as of early 2026). A clean implementation here would be a meaningful contribution.
+A `PreToolUse` + `PostToolUse` hook pair intercepts every write to MEMORY.md. Before the change becomes permanent the user sees a unified diff and chooses: approve, edit in `$EDITOR`, or discard (restores from backup made by the pre-hook). See the [README](README.md#review-memory-writesh--manual-review-before-changes-stick) for setup instructions.
 
 ---
 
