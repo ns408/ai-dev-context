@@ -1,62 +1,66 @@
 # ai-dev-context
 
-A two-tier AI context and memory system for Claude Code and other AI coding assistants.
+A tool for syncing your developer identity across AI coding assistants.
 
-Solves the two most painful problems with AI-assisted development:
+Your preferences, conventions, and project rules — written once, distributed to every tool you use.
 
-1. **Context loss between sessions** — every new session starts cold, re-explaining the same project background
-2. **Multi-tool drift** — Cursor, Windsurf, Cline, GitHub Copilot, and Codex each need their own config format; keeping them in sync is manual and error-prone
+Developed on **macOS**. The script is POSIX-compatible bash with no external dependencies, so Linux (Ubuntu/Debian) should work but hasn't been tested.
 
-Developed on **macOS**. Both scripts are POSIX-compatible bash with no platform-specific dependencies, so Linux (Ubuntu/Debian) should work — but hasn't been tested yet.
+---
+
+## The problem
+
+Every AI coding tool (Claude Code, Cursor, Windsurf, Cline, Copilot, Codex) reads from a different config file in a different format. Keeping them in sync as your preferences evolve is manual and error-prone.
+
+Most tools now capture session memories automatically. What they don't do is share your preferences across tools, or let you author them deliberately. This project maintains a single source of truth for your coding identity and generates the per-tool config each assistant expects.
 
 ---
 
 ## How it works
 
 ```
-  Tier 1: ~/.config/ai/context.md          ─┐
-  Tier 2: ~/.config/ai/projects/<repo>.md  ─┴── ai-config-sync.sh ──► .claude/CLAUDE.md     → Claude Code
-               │                                                    ──► .cursorrules          → Cursor
-               │                                                    ──► .windsurfrules        → Windsurf
-               │                                                    ──► .clinerules           → Cline
-               │                                                    ──► copilot-instructions  → Copilot
-               │                                                    ──► AGENTS.md             → Codex
-               │
-               └── ai-memory-link.sh ──► ~/.claude/projects/<encoded>/memory/MEMORY.md
-                                                    (symlink → Tier 2)
-                                                          │
-                                                          └─ auto-injected by Claude Code at session start
+~/.config/ai/context.md         your global developer identity
+.ai/project.md                  optional per-project rules (committed to repo)
+        |
+        v
+  ai-config-sync.sh
+        |
+        +---> .claude/CLAUDE.md                (@ reference, stays live)     -> Claude Code
+        +---> .cursorrules                     (inlined)                     -> Cursor
+        +---> .windsurfrules                   (inlined)                     -> Windsurf
+        +---> .clinerules                      (inlined)                     -> Cline
+        +---> .github/copilot-instructions.md  (inlined)                     -> Copilot
+        +---> AGENTS.md                        (inlined)                     -> Codex / others
 ```
 
-The scripts live in your PATH (e.g. `~/.local/bin/`) and are run once per project.
+The script lives in your PATH and is run once per project (or after updating your global context).
 
 ---
 
 ## Quickstart
 
 ```bash
-# 1. Install your global context
+# 1. Set up your global context
 mkdir -p ~/.config/ai
 cp templates/context.md ~/.config/ai/context.md
-# Edit it — fill in {{MACHINE_SPECS}}, {{AI_TOOLS_LIST}}, adjust prefs
+# Edit it: fill in {{MACHINE_SPECS}}, {{AI_TOOLS_LIST}}, adjust preferences
 
-# 2. Install the scripts
-cp scripts/ai-config-sync.sh scripts/ai-memory-link.sh ~/.local/bin/
-chmod +x ~/.local/bin/ai-config-sync.sh ~/.local/bin/ai-memory-link.sh
+# 2. Install the script
+cp scripts/ai-config-sync.sh ~/.local/bin/
+chmod +x ~/.local/bin/ai-config-sync.sh
 
-# 3. Set up a project
+# 3. Sync a project
 cd /path/to/your-project
-ai-memory-link.sh .          # creates ~/.config/ai/projects/your-project.md + symlink
-ai-config-sync.sh --all .    # writes .claude/CLAUDE.md, .cursorrules, .windsurfrules, etc.
+ai-config-sync.sh --all .
 ```
 
-That's it. Open the project in any AI tool — it reads its config and has full context.
+Open the project in any AI tool. It reads its config and has your full context.
 
 ---
 
-## Tier 1 — Global context (`~/.config/ai/context.md`)
+## Global context (`~/.config/ai/context.md`)
 
-This file is the source of truth for everything that applies to every project:
+The source of truth for everything that applies to every project:
 
 - Machine specs and OS details
 - AI tools installed
@@ -66,33 +70,13 @@ This file is the source of truth for everything that applies to every project:
 - Design axiom and quality rules
 - Commit message and PR style
 
-See [`templates/context.md`](templates/context.md) for the template and [`examples/context.md`](examples/context.md) for a filled-in example (macOS-specific — Linux users substitute their own specs for `{{MACHINE_SPECS}}`).
+See [templates/context.md](templates/context.md) for the template and [examples/context.md](examples/context.md) for a filled-in example.
 
 ---
 
-## Tier 2 — Project memory (`~/.config/ai/projects/<repo-name>.md`)
+## ai-config-sync.sh
 
-This file tracks the evolving state of a specific project:
-
-- Implementation status (what's built, what works, what's pending)
-- Key technical decisions and why they were made
-- Bugs fixed and the patterns that solved them
-- Workflow commands for common tasks
-
-The file lives outside any repo (`~/.config/ai/projects/`) so it:
-- Persists across worktrees, branches, and forks
-- Is never accidentally committed
-- Can be backed up or version-controlled independently
-
-`ai-memory-link.sh` creates a symlink at the path Claude Code expects (`~/.claude/projects/<encoded-path>/memory/MEMORY.md`), so Claude auto-injects the memory at session start without any extra configuration.
-
-See [`templates/MEMORY.md`](templates/MEMORY.md) for the skeleton and [`examples/MEMORY.md`](examples/MEMORY.md) for a filled-in example.
-
----
-
-## ai-config-sync.sh — multi-tool config generation
-
-`ai-config-sync.sh` reads your Tier 1 global context and Tier 2 project memory, then writes tool-specific config files. Each tool has its own format; the script handles the differences.
+Reads your global context and writes tool-specific config files. Each tool has its own format; the script handles the differences.
 
 ```bash
 ai-config-sync.sh --all /path/to/project
@@ -111,29 +95,50 @@ ai-config-sync.sh --cursor --windsurf .
 | `--codex` | `AGENTS.md` |
 | `--all` | all of the above |
 
-Generated files are added to `.gitignore` automatically. See [`docs/CROSS_TOOL_SYNC.md`](docs/CROSS_TOOL_SYNC.md) for details on why generation is better than symlinks.
+Generated files are added to `.gitignore` automatically — they contain personal machine specs and preferences, so they should not be committed.
+
+For Claude Code, the generated CLAUDE.md uses `@~/.config/ai/context.md` so context is loaded live at each session start. No re-sync needed when your global context changes. For all other tools, context is inlined at generation time, so re-run the script after significant updates.
+
+See [docs/CROSS_TOOL_SYNC.md](docs/CROSS_TOOL_SYNC.md) for details.
+
+---
+
+## Optional: per-project rules (`.ai/project.md`)
+
+For project-specific rules you want every tool to know — not just Claude Code:
+
+```bash
+mkdir -p .ai
+cat > .ai/project.md << 'EOF'
+- Use Bun, not npm or yarn
+- Never edit files in db/migrations/ directly
+- Auth logic lives in src/auth/ — check there before writing new auth code
+EOF
+
+ai-config-sync.sh --all .
+```
+
+This file is committed to the repo. It gets injected into every generated tool config alongside your global context. For Claude Code specifically, project-specific instructions are better placed in a committed `CLAUDE.md` — `.ai/project.md` earns its keep when you want the same rules in Cursor, Windsurf, or Cline too.
+
+---
+
+## Session memory
+
+Claude Code (v2.1.59+), Windsurf Cascade, and GitHub Copilot all capture session memories automatically. You don't need to manage this manually.
+
+`ai-memory-link.sh` in this repo was an earlier approach to centralising Claude Code's memory before auto-memory existed. It is now **deprecated** — kept for users on older Claude Code versions. See the script header for details.
 
 ---
 
 ## Complementary tools
 
-These tools solve adjacent problems and work well alongside this system:
-
 | Tool | What it does | Relationship |
 |------|-------------|--------------|
-| [claude-mem](https://github.com/sirmews/claude-mem) | Captures sessions, compresses with AI, SQLite+Chroma for vector search | Memory capture, no multi-tool sync |
-| [claude-diary](https://github.com/rbigeard/claude-diary) | Auto-updates CLAUDE.md from session activity | Closer to auto-MEMORY.md; Claude-only |
-| [memory-mcp](https://github.com/modelcontextprotocol/servers) | MCP server + git versioning per session | Complementary for MCP workflows |
-| AGENTS.md pattern | Single master file + symlinks | Simpler; doesn't handle per-tool format differences |
+| [claude-mem](https://github.com/sirmews/claude-mem) | Captures sessions, compresses with AI, SQLite+Chroma vector search | Session capture only, no multi-tool sync |
+| [claude-diary](https://github.com/rbigeard/claude-diary) | Auto-updates CLAUDE.md from session activity | Claude-only, no sync |
+| [Knowledge Graph Memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | Official Anthropic MCP server, entity/relation graph | Complementary for MCP-based memory workflows |
+| [basic-memory](https://github.com/basicmachines-co/basic-memory) | Third-party MCP server, local-only, AGPL, hybrid full-text + vector search | Privacy-first alternative to cloud memory |
 | [ClaudeMDEditor](https://marketplace.visualstudio.com/items?itemName=ClaudeMDEditor) | Visual UI to manage AI config files | GUI wrapper, no automation |
-
----
-
-## Known limitations
-
-- Memory is auto-injected at session start ✅
-- Memory is **not** auto-saved when you close the window — the `SessionEnd` hook does not reliably fire; VS Code terminates the extension host before it completes
-- The only reliable way to save memory is to explicitly ask Claude to save before you close (e.g. "save memory and wrap up")
 
 ---
 

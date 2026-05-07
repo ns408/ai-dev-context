@@ -1,19 +1,18 @@
 # Contributing
 
-This project is in early, working state. Contributions that improve clarity, fix bugs in the scripts, or tackle the open problems below are welcome.
+This project is in active development. Contributions that improve clarity, fix bugs in the scripts, or tackle the open problems below are welcome.
 
 ---
 
 ## Open problems worth solving
 
-### 1. Memory review UX before commit
+### 1. Auto-memory review before propagation
 
-**The gap:** Claude Code's auto-memory writes MEMORY.md silently during a session. There's no moment where you review what was written before it becomes permanent. You might end up persisting wrong conclusions, misattributed bugs, or stale state.
+**The gap:** Claude Code auto-memory (v2.1.59+) writes to `~/.claude/projects/<encoded>/memory/MEMORY.md` silently during a session. There is no moment to review what was captured before it gets picked up in the next session. Wrong conclusions, misattributed bugs, or stale state can persist.
 
-**The idea:** A `PostToolUse` hook that fires whenever MEMORY.md is written. The hook would show a diff of changes and prompt: approve, edit, or discard.
+**The idea:** A `PostToolUse` hook that fires when Claude Code writes to a MEMORY.md file. The hook compares the new content against existing entries and either shows a diff for approval or blocks duplicate/contradictory entries automatically.
 
 ```json
-// .claude/settings.json
 {
   "hooks": {
     "PostToolUse": [{
@@ -28,39 +27,39 @@ This project is in early, working state. Contributions that improve clarity, fix
 ```
 
 The hook script would:
-1. Check if the written file is `MEMORY.md`
-2. Show `git diff` of the change
-3. Prompt: approve / edit / discard
-4. On discard: `git checkout -- MEMORY.md`
+1. Check if the written file is a MEMORY.md in `~/.claude/projects/`
+2. Compare new content against existing entries (string match or embeddings)
+3. Exit with code 2 to block if a duplicate or contradiction is detected, with the reason sent via stderr back to Claude
+4. Otherwise approve silently (exit 0)
 
-This is genuinely unaddressed by any existing tool (as of early 2026). A clean implementation here would be a meaningful contribution.
+Exit code 2 blocks the write before it lands, and stderr content is fed back to Claude as context to correct the entry. See [docs/HOOKS.md](docs/HOOKS.md) for the hook mechanics.
 
 ---
 
 ### 2. Cross-project lessons extractor
 
-**The gap:** Patterns and fixes discovered in one project often apply elsewhere. Right now they live in per-project MEMORY.md files and are never surfaced elsewhere.
+**The gap:** Patterns and fixes discovered in one project often apply elsewhere. Right now they are scattered across per-project memory files and are never surfaced globally.
 
-**The idea:** A script that scans all `~/.config/ai/projects/*.md` files, extracts `## Bugs Fixed` and `## Key Technical Decisions` sections, and writes a deduplicated `~/.config/ai/lessons.md`. That file could then be injected into `~/.config/ai/context.md` or referenced from project CLAUDE.md files.
+**Partial solution:** Synthesising lessons manually into a `TEMP/lessons.md` file per project works well for deep research (pull from multiple sources, deduplicate, distil). The remaining gap is automation: a script that scans all project notes and extracts reusable patterns without manual effort.
+
+**The idea:** A script that scans committed `project.md` files (or Claude Code auto-memory files), extracts `## Key Technical Decisions` sections, and writes a deduplicated `~/.config/ai/lessons.md`. That file could then be referenced from `~/.config/ai/context.md`.
 
 Possible implementation:
-- Parse MEMORY.md files with a simple markdown section extractor
+- Parse project.md files with a simple markdown section extractor
 - Deduplicate by semantic similarity (embeddings) or keyword clustering
-- Output as a single lessons file, optionally appended to global context
+- Output as a flat lessons file, optionally appended to global context
 
 ---
 
-### 3. Hook-based memory save: known gap on session close
+### 3. Kiro steering generation
 
-**The gap:** The natural approach to auto-saving memory is two hooks working together: a `Stop` hook that fires after every response (triggered by a phrase you say when you want to save), and a `SessionEnd` hook as a mechanical fallback that parses the session transcript and writes whatever it can. Belt and suspenders.
+**The gap:** `ai-config-sync.sh` generates configs for Claude Code, Cursor, Windsurf, Cline, Copilot, and Codex. It does not generate Kiro steering files.
 
-The problem: **the SessionEnd hook does not reliably fire on any quit** — normal close or force-quit. VS Code terminates the extension host before the hook completes. The `Stop` hook is the only gate that actually works; `SessionEnd` is unreliable in practice.
+Kiro uses a different shape: YAML-frontmatter markdown files in `.kiro/steering/`, one file per steering area (e.g. `identity.md`, `testing.md`). A flat injection of `context.md` into a single file would not map cleanly to Kiro's model.
 
-This means:
-- If you explicitly ask Claude to save memory before closing, it will be saved ✅
-- If you just close the window, it probably won't be ❌
+**The idea:** A `--kiro` flag for `ai-config-sync.sh` that generates `.kiro/steering/identity.md` from the global context, splitting sections into separate steering files where appropriate.
 
-**The idea:** A reliable fallback that doesn't depend on the extension host staying alive — for example, periodic auto-save triggered from within the session (not on exit), or a pre-close save prompt surfaced by the IDE.
+This is lower priority until Kiro's adoption and steering file format stabilise.
 
 ---
 
