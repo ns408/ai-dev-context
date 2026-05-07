@@ -1,7 +1,6 @@
 # <repo-name> — Claude Code Context
 
-Read `~/.config/ai/context.md` for machine specs and coding preferences.
-Read `~/.config/ai/projects/<repo-name>.md` for project memory and history.
+@~/.config/ai/context.md
 
 ---
 

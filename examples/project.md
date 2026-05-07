@@ -1,16 +1,7 @@
-# Project Memory — my-cli-tool
+# Project Notes — my-cli-tool
 
-This file is auto-injected by Claude Code at the start of every session.
-Keep it under 200 lines. Architecture and rules live in CLAUDE.md.
-This file covers current implementation state only.
-
----
-
-## User Preferences
-
-- Always use `bun` for package management, not npm or yarn
-- Never auto-commit — always show diff and ask first
-- Prefer editing existing files over creating new ones
+<!-- Committed to repo. Injected into all AI tool configs via ai-config-sync.sh.
+     Session memories are captured automatically by Claude Code and Windsurf. -->
 
 ---
 
@@ -46,17 +37,7 @@ We compile with esbuild for 10x faster builds. Type-checking still runs separate
 Chose `commander` for smaller bundle size and simpler API. `yargs` has better built-in validation but the extra 40 KB wasn't worth it for a CLI tool.
 
 ### Dynamic plugin loading via `import()`
-Plugins are loaded with `await import(pluginPath)` at runtime. This means no build step for plugins — users drop a `.plugin.ts` file and it works. Trade-off: requires `tsx` or `ts-node` in the user's env.
-
----
-
-## Bugs Fixed
-
-| Bug | Fix |
-|-----|-----|
-| `commander` exits process on `--help` in tests | Pass `{ exitOverride: true }` to `new Command()` in test mode |
-| esbuild external plugin not found | Add `node_modules` to `external` array in esbuild config |
-| chokidar symlink crash on macOS | Use `{ usePolling: true }` when `process.platform === 'darwin'` |
+Plugins are loaded with `await import(pluginPath)` at runtime. No build step needed for plugins — users drop a `.plugin.ts` file and it works. Trade-off: requires `tsx` or `ts-node` in the user's env.
 
 ---
 

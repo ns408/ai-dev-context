@@ -16,14 +16,12 @@
 #   --all       Enable all of the above
 #   -h, --help  Show this help and exit
 #
-# Creates/updates tool-specific files that include the canonical context
-# from ~/.config/ai/context.md plus any project-specific instructions.
-# If centralized memory exists for the project, it is inlined into
-# non-Claude configs and referenced in Claude's config.
+# Source of truth: ~/.config/ai/context.md (your global developer identity).
+# Optional per-project rules: .ai/project.md (committed to repo, injected into all tools).
+# Claude Code session memory is handled natively by Claude Code auto-memory.
 set -euo pipefail
 
 CANONICAL="${HOME}/.config/ai/context.md"
-CENTRAL_MEMORY_DIR="${HOME}/.config/ai/projects"
 
 # --- Parse arguments ---
 ENABLE_CURSOR=false
@@ -48,7 +46,7 @@ while [[ $# -gt 0 ]]; do
             ENABLE_CODEX=true
             shift ;;
         -h|--help)
-            sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         -*)
             echo "Unknown option: $1" >&2
@@ -64,31 +62,11 @@ PROJECT_DIR="$(cd "${PROJECT_DIR:-.}" && pwd)"
 
 if [[ ! -f "$CANONICAL" ]]; then
     echo "Error: Canonical context not found at ${CANONICAL}" >&2
-    echo "Create it first, or run ns-bootstrap." >&2
+    echo "Create it first, or copy templates/context.md and fill in your details." >&2
     exit 1
 fi
 
-# Read canonical content
 CONTEXT="$(cat "$CANONICAL")"
-
-# --- Detect repo name ---
-REPO_NAME=""
-if git -C "$PROJECT_DIR" rev-parse --is-inside-work-tree &>/dev/null; then
-    remote_url="$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null || true)"
-    if [[ -n "$remote_url" ]]; then
-        REPO_NAME="$(basename "$remote_url" .git)"
-    fi
-fi
-if [[ -z "$REPO_NAME" ]]; then
-    REPO_NAME="$(basename "$PROJECT_DIR")"
-fi
-
-# --- Load centralized memory if it exists ---
-MEMORY_CONTENT=""
-MEMORY_FILE="${CENTRAL_MEMORY_DIR}/${REPO_NAME}.md"
-if [[ -f "$MEMORY_FILE" ]] && [[ -s "$MEMORY_FILE" ]]; then
-    MEMORY_CONTENT="$(cat "$MEMORY_FILE")"
-fi
 
 # --- Helper ---
 write_if_changed() {
@@ -106,24 +84,23 @@ write_if_changed() {
     echo "  updated:   ${dest#"$PROJECT_DIR"/}"
 }
 
-echo "Syncing AI config into ${PROJECT_DIR} (repo: ${REPO_NAME})..."
+echo "Syncing AI config into ${PROJECT_DIR}..."
 
-# Detect project-specific instructions if they exist
+# Load optional per-project rules (.ai/project.md committed to repo).
+# Use this for project-specific rules you want in every tool config —
+# e.g. "use Bun not npm" or "never edit db/migrations/ directly".
+# Most projects won't need this file.
 PROJECT_NOTES=""
 if [[ -f "${PROJECT_DIR}/.ai/project.md" ]]; then
     PROJECT_NOTES="$(cat "${PROJECT_DIR}/.ai/project.md")"
 fi
 
-# --- Claude Code (.claude/CLAUDE.md) — always generated ---
-# Claude reads files natively, so reference the central memory file instead of inlining
+# --- Claude Code (.claude/CLAUDE.md) ---
+# Uses @ syntax: context.md is loaded at session start by Claude Code directly.
+# No re-sync needed when context.md changes — the @ reference stays live.
 CLAUDE_BODY="# Claude Code — Project Instructions
 
-Read \`~/.config/ai/context.md\` for machine specs and coding preferences."
-
-if [[ -n "$MEMORY_CONTENT" ]]; then
-    CLAUDE_BODY="${CLAUDE_BODY}
-Read \`${MEMORY_FILE}\` for project memory and history."
-fi
+@~/.config/ai/context.md"
 
 if [[ -n "$PROJECT_NOTES" ]]; then
     CLAUDE_BODY="${CLAUDE_BODY}
@@ -135,20 +112,9 @@ fi
 
 write_if_changed "${PROJECT_DIR}/.claude/CLAUDE.md" "$CLAUDE_BODY"
 
-# --- Helper: append memory to non-Claude tool bodies ---
-append_memory() {
-    local body="$1"
-    if [[ -n "$MEMORY_CONTENT" ]]; then
-        body="${body}
-
-## Project Memory
-
-${MEMORY_CONTENT}"
-    fi
-    echo "$body"
-}
-
 # --- Optional tool configs ---
+# These tools cannot load files at runtime, so context is inlined directly.
+# Re-run ai-config-sync after updating context.md to refresh these files.
 
 if $ENABLE_CURSOR; then
     CURSOR_BODY="# Cursor Rules
@@ -162,7 +128,6 @@ ${CONTEXT}"
 
 ${PROJECT_NOTES}"
     fi
-    CURSOR_BODY="$(append_memory "$CURSOR_BODY")"
     write_if_changed "${PROJECT_DIR}/.cursorrules" "$CURSOR_BODY"
 fi
 
@@ -178,7 +143,6 @@ ${CONTEXT}"
 
 ${PROJECT_NOTES}"
     fi
-    WINDSURF_BODY="$(append_memory "$WINDSURF_BODY")"
     write_if_changed "${PROJECT_DIR}/.windsurfrules" "$WINDSURF_BODY"
 fi
 
@@ -194,7 +158,6 @@ ${CONTEXT}"
 
 ${PROJECT_NOTES}"
     fi
-    CLINE_BODY="$(append_memory "$CLINE_BODY")"
     write_if_changed "${PROJECT_DIR}/.clinerules" "$CLINE_BODY"
 fi
 
@@ -210,7 +173,6 @@ ${CONTEXT}"
 
 ${PROJECT_NOTES}"
     fi
-    COPILOT_BODY="$(append_memory "$COPILOT_BODY")"
     write_if_changed "${PROJECT_DIR}/.github/copilot-instructions.md" "$COPILOT_BODY"
 fi
 
@@ -226,7 +188,6 @@ ${CONTEXT}"
 
 ${PROJECT_NOTES}"
     fi
-    CODEX_BODY="$(append_memory "$CODEX_BODY")"
     write_if_changed "${PROJECT_DIR}/AGENTS.md" "$CODEX_BODY"
 fi
 
@@ -238,7 +199,6 @@ ensure_gitignored() {
         return
     fi
 
-    # Build the list of entries to gitignore based on what's enabled
     local entries=(".claude/")
     $ENABLE_CURSOR   && entries+=(".cursor/" ".cursorrules")
     $ENABLE_WINDSURF && entries+=(".windsurfrules")

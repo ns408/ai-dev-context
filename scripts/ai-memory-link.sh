@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# DEPRECATED: Claude Code v2.1.59+ captures project memory automatically at
+# ~/.claude/projects/<encoded-path>/memory/. This script is no longer needed
+# for Claude Code users on v2.1.59+. Kept for users on older versions.
+#
 # Link centralized AI project memory to IDE-specific locations.
 #
 # Usage:

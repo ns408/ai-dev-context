@@ -17,7 +17,7 @@ Managed by: ~/.config/ai/scripts/ai-config-sync.sh
 {{AI_TOOLS_LIST}}
 
 <!-- Example:
-- **IDEs:** Cursor, Visual Studio Code, Windsurf
+- **IDEs:** Cursor, Visual Studio Code, Windsurf, Kiro
 - **IDE Plugins:** Cline, Claude Code, GitHub Copilot
 - **Browser:** Arc
 -->
@@ -28,6 +28,21 @@ Managed by: ~/.config/ai/scripts/ai-config-sync.sh
 - Never use system Python/Node. Check for `.mise.toml` in the project root first.
 - If absent, run `mise use python@<version>` or `mise use node@<version>` before installing dependencies.
 - If mise exec is not picking up site-packages outside a project directory, invoke Python via its full path: `~/.local/share/mise/installs/python/<version>/bin/python`.
+
+## Collaboration Protocol
+
+<!-- Optional but recommended. Defines how Claude should behave across all sessions. -->
+
+### Conversation Modes
+Declare the mode at the start of every response. Do not mix modes unless asked.
+- **Explore** — Generating options, research, brainstorming. Nothing is decided. No implementation.
+- **Decide** — Narrowing to clear recommendations with reasoning and trade-offs. Still no changes until permission.
+- **Implement** — Only after explicit user permission. Execute agreed work, then report exactly what changed and stop.
+
+### Permission Gate
+Never make changes to files, code, or the project unless the user explicitly says one of:
+"Go ahead and implement", "Do it", "Write that up", or "Make that change".
+Ambiguous replies ("sounds good", "interesting", thumbs-up) do not count. If in doubt, ask.
 
 ## Coding Preferences
 
