@@ -60,6 +60,13 @@ done
 
 PROJECT_DIR="$(cd "${PROJECT_DIR:-.}" && pwd)"
 
+if [[ "$PROJECT_DIR" == "$HOME" ]]; then
+    echo "Error: refusing to run against \$HOME ($HOME)." >&2
+    echo "That would overwrite a hand-maintained ~/.claude/CLAUDE.md with a project pointer." >&2
+    echo "Run ai-config-sync inside a project directory instead." >&2
+    exit 1
+fi
+
 if [[ ! -f "$CANONICAL" ]]; then
     echo "Error: Canonical context not found at ${CANONICAL}" >&2
     echo "Create it first, or copy templates/context.md and fill in your details." >&2
